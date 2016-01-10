@@ -8,7 +8,10 @@ use Clone qw(clone);
 sub zip {
   my($directory, $version) = @_;
 
-  my $zipfile = "web/$directory-$version.zip";
+  my $base_filename = $directory;
+  $base_filename =~ s!/!_!g;
+
+  my $zipfile = "web/$base_filename-$version.zip";
 
   unlink($zipfile);
   system("zip -r $zipfile $directory");
@@ -19,6 +22,25 @@ sub zip {
   $zipfile =~ s@web/@@;
 
   return { filename => $zipfile, sha256 => $sha256, size => $filestats->size() };
+}
+
+sub tar_gz {
+  my($directory, $version) = @_;
+
+  my $base_filename = $directory;
+  $base_filename =~ s!/!_!g;
+
+  my $tarfile = "web/$base_filename-$version.tar.gz";
+
+  unlink($tarfile);
+  system("tar zcf $tarfile $directory");
+  my $sha256 = `sha256sum $tarfile`;
+  $sha256 =~ s/ .*//s;
+  my $filestats = stat("$tarfile");
+
+  $tarfile =~ s@web/@@;
+
+  return { filename => $tarfile, sha256 => $sha256, size => $filestats->size() };
 }
 
 sub read_json {
@@ -63,7 +85,7 @@ sub prepare_platform_pkg {
 }
 
 sub prepare_tools_pkg {
-  my($old_version_number,$new_version_number,$tool_data,$tool_archive) = @_;
+  my($old_version_number,$new_version_number,$tool_data,$tool_archives) = @_;
 
   my($new_tools);
   for(my $i = 0; $i < @$tool_data; $i++) {
@@ -77,6 +99,17 @@ sub prepare_tools_pkg {
   }
   $new_tools->{version} = $new_version_number;
   for(my $i = 0; $i < @{$new_tools->{systems}}; $i++) {
+    my $tool_archive;
+    if($new_tools->{systems}[$i]{host} eq "i686-mingw32") {
+      $tool_archive = $tool_archives->{win};
+    } elsif($new_tools->{systems}[$i]{host} =~ /^(x86_64|i386)-apple-darwin$/) {
+      $tool_archive = $tool_archives->{macosx};
+    } elsif($new_tools->{systems}[$i]{host} =~ /^(x86_64|i686)-pc-linux-gnu$/) {
+      $tool_archive = $tool_archives->{linux};
+    } else {
+      die("unknown tool pkg host: ".$new_tools->{systems}[$i]{host});
+    }
+
     $new_tools->{systems}[$i]{url} = "http://dan.drown.org/arduino/".$tool_archive->{filename};
     $new_tools->{systems}[$i]{archiveFileName} = $tool_archive->{filename};
     $new_tools->{systems}[$i]{checksum} = "SHA-256:".$tool_archive->{sha256};
@@ -99,12 +132,21 @@ my $lastversion = $testing_pkgs->{packages}{platforms}[-1];
 my $version = new_version($lastversion->{version});
 
 my($stm32f1) = zip("STM32F1",$version);
-my($tools) = zip("tools",$version);
+my($tools_win) = zip("tools/win",$version);
+my($tools_linux) = tar_gz("tools/linux",$version);
+my($tools_macosx) = tar_gz("tools/macosx",$version);
 printf("%s %s %d\n", $stm32f1->{filename}, $stm32f1->{sha256}, $stm32f1->{size});
-printf("%s %s %d\n", $tools->{filename}, $tools->{sha256}, $tools->{size});
+printf("%s %s %d\n", $tools_win->{filename}, $tools_win->{sha256}, $tools_win->{size});
+printf("%s %s %d\n", $tools_linux->{filename}, $tools_linux->{sha256}, $tools_linux->{size});
+printf("%s %s %d\n", $tools_macosx->{filename}, $tools_macosx->{sha256}, $tools_macosx->{size});
+my(%tools) = (
+  win => $tools_win,
+  linux => $tools_linux,
+  macosx => $tools_macosx
+);
 
 my($new_version) = prepare_platform_pkg($lastversion, $stm32f1, $version);
-my($new_tools) = prepare_tools_pkg($lastversion->{version}, $version, $testing_pkgs->{packages}{tools}, $tools);
+my($new_tools) = prepare_tools_pkg($lastversion->{version}, $version, $testing_pkgs->{packages}{tools}, \%tools);
 
 push(@{$testing_pkgs->{packages}{platforms}}, $new_version);
 push(@{$testing_pkgs->{packages}{tools}}, $new_tools);

@@ -9,5 +9,6 @@ other/maple-bootloader/*~
 tools/src/stm32flash_serial/src/parsers/parsers.a
 web/Makefile
 web/*.zip
+web/*.tar.gz
 web/*.json
 web/*.json.*
