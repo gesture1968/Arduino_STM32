@@ -7,3 +7,7 @@ other/maple-bootloader/build
 other/maple-bootloader/*~
 *.o
 tools/src/stm32flash_serial/src/parsers/parsers.a
+web/Makefile
+web/*.zip
+web/*.json
+web/*.json.*

@@ -1,0 +1,112 @@
+#!/usr/bin/perl -w
+
+use strict;
+use File::stat;
+use JSON::XS qw(encode_json decode_json);
+use Clone qw(clone);
+
+sub zip {
+  my($directory, $version) = @_;
+
+  my $zipfile = "web/$directory-$version.zip";
+
+  unlink($zipfile);
+  system("zip -r $zipfile $directory");
+  my $sha256 = `sha256sum $zipfile`;
+  $sha256 =~ s/ .*//s;
+  my $filestats = stat("$zipfile");
+
+  $zipfile =~ s@web/@@;
+
+  return { filename => $zipfile, sha256 => $sha256, size => $filestats->size() };
+}
+
+sub read_json {
+  my($filename) = @_;
+
+  open(JSON, "<", $filename) or die("error opening $filename: $!");
+  my($data) = decode_json(join("",<JSON>));
+  close(JSON);
+
+  return $data;
+}
+
+sub write_json {
+  my($data,$filename) = @_;
+
+  my $json = JSON::XS->new->pretty;
+
+  open(JSON, ">", "$filename.tmp") or die("unable to write temporary file: $!");
+  print JSON $json->encode($data)."\n";
+  close(JSON);
+
+  rename("$filename.tmp",$filename);
+}
+
+sub prepare_platform_pkg {
+  my($old_version,$stm32f1,$version) = @_;
+
+  my $new_version = clone($old_version);
+  $new_version->{version} = $version;
+  $new_version->{url} = "http://dan.drown.org/arduino/".$stm32f1->{filename};
+  $new_version->{archiveFileName} = $stm32f1->{filename};
+  $new_version->{checksum} = "SHA-256:".$stm32f1->{sha256};
+  $new_version->{size} = $stm32f1->{size};
+  for(my $i = 0; $i < @{$new_version->{toolsDependencies}}; $i++) {
+    if($new_version->{toolsDependencies}[$i]{name} eq "stm32tools") {
+      $new_version->{toolsDependencies}[$i]{version} = $version;
+      last;
+    }
+  }
+
+  return $new_version;
+}
+
+sub prepare_tools_pkg {
+  my($old_version_number,$new_version_number,$tool_data,$tool_archive) = @_;
+
+  my($new_tools);
+  for(my $i = 0; $i < @$tool_data; $i++) {
+    if($tool_data->[$i]{name} eq "stm32tools" and $tool_data->[$i]{version} eq $old_version_number) {
+      $new_tools = clone($tool_data->[$i]);
+      last;
+    }
+  }
+  if(not ref($new_tools)) {
+    die("unable to find version $old_version_number of tools stm32tools");
+  }
+  $new_tools->{version} = $new_version_number;
+  for(my $i = 0; $i < @{$new_tools->{systems}}; $i++) {
+    $new_tools->{systems}[$i]{url} = "http://dan.drown.org/arduino/".$tool_archive->{filename};
+    $new_tools->{systems}[$i]{archiveFileName} = $tool_archive->{filename};
+    $new_tools->{systems}[$i]{checksum} = "SHA-256:".$tool_archive->{sha256};
+    $new_tools->{systems}[$i]{size} = $tool_archive->{size};
+  }
+
+  return $new_tools;
+}
+
+sub new_version {
+  my($old_version) = @_;
+
+  my($major,$minor,$release) = split(/\./,$old_version,3);
+  $release++;
+  return "$major.$minor.$release";
+}
+
+my($testing_pkgs) = read_json("web/testing.json");
+my $lastversion = $testing_pkgs->{packages}{platforms}[-1];
+my $version = new_version($lastversion->{version});
+
+my($stm32f1) = zip("STM32F1",$version);
+my($tools) = zip("tools",$version);
+printf("%s %s %d\n", $stm32f1->{filename}, $stm32f1->{sha256}, $stm32f1->{size});
+printf("%s %s %d\n", $tools->{filename}, $tools->{sha256}, $tools->{size});
+
+my($new_version) = prepare_platform_pkg($lastversion, $stm32f1, $version);
+my($new_tools) = prepare_tools_pkg($lastversion->{version}, $version, $testing_pkgs->{packages}{tools}, $tools);
+
+push(@{$testing_pkgs->{packages}{platforms}}, $new_version);
+push(@{$testing_pkgs->{packages}{tools}}, $new_tools);
+
+write_json($testing_pkgs,"web/testing.json");
