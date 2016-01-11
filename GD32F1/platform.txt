@@ -23,6 +23,7 @@ compiler.S.cmd=arm-none-eabi-gcc
 compiler.S.flags=-c -g -x assembler-with-cpp -MMD
 compiler.cpp.cmd=arm-none-eabi-g++
 compiler.cpp.flags=-c -g -Os {compiler.warning_flags} -MMD -ffunction-sections -fdata-sections -nostdlib --param max-inline-insns-single=500 -fno-rtti -fno-exceptions -DBOARD_{build.variant} -D{build.vect} -DERROR_LED_PORT={build.error_led_port} -DERROR_LED_PIN={build.error_led_pin} 
+compiler.cpreprocessor.flags="-I{build.system.path}/libmaple/include/" "-I{build.system.path}/libmaple/"
 compiler.ar.cmd=arm-none-eabi-ar
 compiler.ar.flags=rcs
 compiler.objcopy.cmd=arm-none-eabi-objcopy
@@ -88,7 +89,7 @@ recipe.S.o.pattern="{compiler.path}{compiler.c.cmd}" {compiler.S.flags} -mcpu={b
 #recipe.S.o.pattern="{compiler.path}{compiler.c.cmd}" "{source_file}" -o "{object_file}"
 
 ## Create archives
-recipe.ar.pattern="{compiler.path}{compiler.ar.cmd}" {compiler.ar.flags} {compiler.ar.extra_flags} "{build.path}/{archive_file}" "{object_file}"
+recipe.ar.pattern="{compiler.path}{compiler.ar.cmd}" {compiler.ar.flags} {compiler.ar.extra_flags} "{archive_file_path}" "{object_file}"
 
 ## Combine gc-sections, archives, and objects
 recipe.c.combine.pattern="{compiler.path}{compiler.c.elf.cmd}" {compiler.c.elf.flags} -mcpu={build.mcu} "-T{build.variant.path}/{build.ldscript}" "-Wl,-Map,{build.path}/{build.project_name}.map" {compiler.c.elf.extra_flags} -o "{build.path}/{build.project_name}.elf" "-L{build.path}" -lm -lgcc -mthumb -Wl,--cref -Wl,--check-sections -Wl,--gc-sections -Wl,--unresolved-symbols=report-all -Wl,--warn-common -Wl,--warn-section-align -Wl,--warn-unresolved-symbols -Wl,--start-group {object_files} "{build.path}/{archive_file}" -Wl,--end-group
@@ -117,9 +118,9 @@ recipe.size.regex.data=^(?:\.data|\.bss|\.noinit)\s+([0-9]+).*
 tools.maple_upload.cmd=maple_upload
 tools.maple_upload.cmd.windows=maple_upload.bat
 #tools.maple_upload.cmd.linux=maple_upload                
-tools.maple_upload.path={runtime.hardware.path}/tools/win
-tools.maple_upload.path.macosx={runtime.hardware.path}/tools/macosx
-tools.maple_upload.path.linux={runtime.hardware.path}/tools/linux    
+tools.maple_upload.path={runtime.tools.stm32tools.path}/win
+tools.maple_upload.path.macosx={runtime.tools.stm32tools.path}/macosx
+tools.maple_upload.path.linux={runtime.tools.stm32tools.path}/linux    
 
 tools.maple_upload.upload.params.verbose=-d
 tools.maple_upload.upload.params.quiet=
@@ -131,9 +132,9 @@ tools.maple_upload.upload.pattern="{path}/{cmd}" {serial.port.file} {upload.altI
 tools.serial_upload.cmd=serial_upload
 tools.serial_upload.cmd.windows=serial_upload.bat
 tools.serial_upload.cmd.macosx=serial_upload
-tools.serial_upload.path={runtime.hardware.path}/tools/win
-tools.serial_upload.path.macosx={runtime.hardware.path}/tools/macosx
-tools.serial_upload.path.linux={runtime.hardware.path}/tools/linux
+tools.serial_upload.path={runtime.tools.stm32tools.path}/win
+tools.serial_upload.path.macosx={runtime.tools.stm32tools.path}/macosx
+tools.serial_upload.path.linux={runtime.tools.stm32tools.path}/linux
 
 tools.serial_upload.upload.params.verbose=-d
 tools.serial_upload.upload.params.quiet=n
@@ -142,9 +143,9 @@ tools.serial_upload.upload.pattern="{path}/{cmd}" {serial.port.file} {upload.alt
 
 tools.upload_router.cmd=upload_router
 tools.upload_router.cmd.windows=upload_router.bat
-tools.upload_router.path={runtime.hardware.path}/tools/win
-tools.upload_router.path.macosx={runtime.hardware.path}/tools/macosx
-tools.upload_router.path.linux={runtime.hardware.path}/tools/linux
+tools.upload_router.path={runtime.tools.stm32tools.path}/win
+tools.upload_router.path.macosx={runtime.tools.stm32tools.path}/macosx
+tools.upload_router.path.linux={runtime.tools.stm32tools.path}/linux
 
 tools.upload_router.upload.params.verbose=-d
 tools.upload_router.upload.params.quiet=
@@ -153,9 +154,9 @@ tools.upload_router.upload.pattern="{path}/{cmd}" {serial.port.file} {upload.alt
 # stlink upload
 tools.stlink_upload.cmd=stlink_upload
 tools.stlink_upload.cmd.windows=stlink_upload.bat
-tools.stlink_upload.path.windows={runtime.hardware.path}/tools/win
-tools.stlink_upload.path.macosx={runtime.hardware.path}/tools/macosx
-tools.stlink_upload.path.linux={runtime.hardware.path}/tools/linux
+tools.stlink_upload.path.windows={runtime.tools.stm32tools.path}/win
+tools.stlink_upload.path.macosx={runtime.tools.stm32tools.path}/macosx
+tools.stlink_upload.path.linux={runtime.tools.stm32tools.path}/linux
 
 tools.stlink_upload.upload.params.verbose=-d
 tools.stlink_upload.upload.params.quiet=
@@ -165,7 +166,7 @@ tools.stlink_upload.upload.pattern="{path}/{cmd}" {serial.port.file} {upload.alt
 tools.bmp_upload.cmd=arm-none-eabi-gdb
 #tools.bmp_upload.cmd.windows=bmp_upload.bat
 tools.bmp_upload.path={runtime.tools.arm-none-eabi-gcc.path}/bin/
-#tools.bmp_upload.path.windows={runtime.hardware.path}/tools/win
+#tools.bmp_upload.path.windows={runtime.tools.stm32tools.path}/win
 
 tools.bmp_upload.upload.speed=230400
 tools.bmp_upload.upload.params.verbose=
