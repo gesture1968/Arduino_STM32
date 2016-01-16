@@ -1,25 +1,54 @@
 #!/usr/bin/perl -w
 
+# Takes no arguments, operates on the file web/testing.json
+# The first run, you will need a copy of web/testing.json that already has the target
+# platforms and tools
+#
+# This tool creates the zip files for the various targets (STM32F1, GD32F1, STM32F3, STM32F4)
+# And also creates the zip or tar.gz files for the various hosts (win, linux, macosx)
+#
+# After it is done, copy the files in web/ to your webserver's directory in $base_url.  
+# The rsync tool can make this easier
+#
+# packages needed to run under cygwin/Windows:
+#   zip, coreutils, tar, perl, perl_base, perl-JSON-XS, perl-Clone
+# packages needed to run under Fedora:
+#   zip, coreutils, tar, perl, perl-JSON-XS, perl-Clone
+# packages needed to run under Debian/Ubuntu:
+#   zip, coreutils, tar, perl, perl-modules, libjson-xs-perl, libclone-perl
+
+# configurable settings
+#######################
+my $base_url = "http://dan.drown.org/arduino/";
+my(@target_list) = ("STM32F1", "GD32F1", "STM32F3", "STM32F4");
+my(@host_list) = ("win", "linux", "macosx");
+my $json_file = "web/testing.json";
+my $destination_dir = "web/";
+
+# libraries
+#######################
 use strict;
 use File::stat;
 use JSON::XS qw(encode_json decode_json);
 use Clone qw(clone);
 
+# code starts here
+#######################
 sub zip {
   my($directory, $version) = @_;
 
   my $base_filename = $directory;
   $base_filename =~ s!/!_!g;
 
-  my $zipfile = "web/$base_filename-$version.zip";
+  my $zipfile = $destination_dir."$base_filename-$version.zip";
 
   unlink($zipfile);
   system("zip -r $zipfile $directory");
   my $sha256 = `sha256sum $zipfile`;
   $sha256 =~ s/ .*//s;
-  my $filestats = stat("$zipfile");
+  my $filestats = stat($zipfile);
 
-  $zipfile =~ s@web/@@;
+  $zipfile =~ s@$destination_dir@@;
 
   return { filename => $zipfile, sha256 => $sha256, size => $filestats->size() };
 }
@@ -30,15 +59,15 @@ sub tar_gz {
   my $base_filename = $directory;
   $base_filename =~ s!/!_!g;
 
-  my $tarfile = "web/$base_filename-$version.tar.gz";
+  my $tarfile = $destination_dir."$base_filename-$version.tar.gz";
 
   unlink($tarfile);
   system("tar zcf $tarfile $directory");
   my $sha256 = `sha256sum $tarfile`;
   $sha256 =~ s/ .*//s;
-  my $filestats = stat("$tarfile");
+  my $filestats = stat($tarfile);
 
-  $tarfile =~ s@web/@@;
+  $tarfile =~ s@$destination_dir@@;
 
   return { filename => $tarfile, sha256 => $sha256, size => $filestats->size() };
 }
@@ -66,22 +95,30 @@ sub write_json {
 }
 
 sub prepare_platform_pkg {
-  my($old_version,$stm32f1,$version) = @_;
+  my($old_platforms,$targets,$version) = @_;
 
-  my $new_version = clone($old_version);
-  $new_version->{version} = $version;
-  $new_version->{url} = "http://dan.drown.org/arduino/".$stm32f1->{filename};
-  $new_version->{archiveFileName} = $stm32f1->{filename};
-  $new_version->{checksum} = "SHA-256:".$stm32f1->{sha256};
-  $new_version->{size} = $stm32f1->{size};
-  for(my $i = 0; $i < @{$new_version->{toolsDependencies}}; $i++) {
-    if($new_version->{toolsDependencies}[$i]{name} eq "stm32tools") {
-      $new_version->{toolsDependencies}[$i]{version} = $version;
-      last;
+  my(@new_records);
+
+  foreach my $target (keys %$targets) {
+    if(not defined $old_platforms->{$target}) {
+      die("target $target not found in the previous version's list of targets");
     }
+    my $new_version = clone($old_platforms->{$target});
+    $new_version->{version} = $version;
+    $new_version->{url} = $base_url.$targets->{$target}{filename};
+    $new_version->{archiveFileName} = $targets->{$target}{filename};
+    $new_version->{checksum} = "SHA-256:".$targets->{$target}{sha256};
+    $new_version->{size} = $targets->{$target}{size};
+    for(my $i = 0; $i < @{$new_version->{toolsDependencies}}; $i++) {
+      if($new_version->{toolsDependencies}[$i]{name} eq "stm32tools") {
+        $new_version->{toolsDependencies}[$i]{version} = $version;
+        last;
+      }
+    }
+    push(@new_records, $new_version);
   }
 
-  return $new_version;
+  return \@new_records;
 }
 
 sub prepare_tools_pkg {
@@ -110,7 +147,7 @@ sub prepare_tools_pkg {
       die("unknown tool pkg host: ".$new_tools->{systems}[$i]{host});
     }
 
-    $new_tools->{systems}[$i]{url} = "http://dan.drown.org/arduino/".$tool_archive->{filename};
+    $new_tools->{systems}[$i]{url} = $base_url.$tool_archive->{filename};
     $new_tools->{systems}[$i]{archiveFileName} = $tool_archive->{filename};
     $new_tools->{systems}[$i]{checksum} = "SHA-256:".$tool_archive->{sha256};
     $new_tools->{systems}[$i]{size} = $tool_archive->{size};
@@ -127,28 +164,43 @@ sub new_version {
   return "$major.$minor.$release";
 }
 
-my($testing_pkgs) = read_json("web/testing.json");
-my $lastversion = $testing_pkgs->{packages}{platforms}[-1];
-my $version = new_version($lastversion->{version});
+sub last_target_platforms {
+  my($testing_pkgs,$version_number) = @_;
 
-my($stm32f1) = zip("STM32F1",$version);
-my($tools_win) = zip("tools/win",$version);
-my($tools_linux) = tar_gz("tools/linux",$version);
-my($tools_macosx) = tar_gz("tools/macosx",$version);
-printf("%s %s %d\n", $stm32f1->{filename}, $stm32f1->{sha256}, $stm32f1->{size});
-printf("%s %s %d\n", $tools_win->{filename}, $tools_win->{sha256}, $tools_win->{size});
-printf("%s %s %d\n", $tools_linux->{filename}, $tools_linux->{sha256}, $tools_linux->{size});
-printf("%s %s %d\n", $tools_macosx->{filename}, $tools_macosx->{sha256}, $tools_macosx->{size});
-my(%tools) = (
-  win => $tools_win,
-  linux => $tools_linux,
-  macosx => $tools_macosx
-);
+  my(%target_platforms);
+  foreach my $platform (@{$testing_pkgs->{packages}{platforms}}) {
+    if($platform->{version} eq $version_number and $platform->{category} eq "STM32") {
+      $target_platforms{$platform->{architecture}} = $platform;
+    }
+  }
 
-my($new_version) = prepare_platform_pkg($lastversion, $stm32f1, $version);
-my($new_tools) = prepare_tools_pkg($lastversion->{version}, $version, $testing_pkgs->{packages}{tools}, \%tools);
+  return \%target_platforms;
+}
 
-push(@{$testing_pkgs->{packages}{platforms}}, $new_version);
-push(@{$testing_pkgs->{packages}{tools}}, $new_tools);
+sub main {
+  my($testing_pkgs) = read_json($json_file);
+  my $lastversion = $testing_pkgs->{packages}{platforms}[-1]{version};
+  my($last_target_platforms) = last_target_platforms($testing_pkgs, $lastversion);
+  my $version = new_version($lastversion);
 
-write_json($testing_pkgs,"web/testing.json");
+  my(%targets);
+  foreach my $target (@target_list) {
+    my($target_zip) = zip($target,$version);
+    $targets{$target} = $target_zip;
+  }
+  my(%tools);
+  foreach my $host (@host_list) {
+    my($tool_zip) = zip("tools/$host",$version);
+    $tools{$host} = $tool_zip;
+  }
+
+  my($new_version) = prepare_platform_pkg($last_target_platforms, \%targets, $version);
+  my($new_tools) = prepare_tools_pkg($lastversion, $version, $testing_pkgs->{packages}{tools}, \%tools);
+
+  push(@{$testing_pkgs->{packages}{platforms}}, @$new_version);
+  push(@{$testing_pkgs->{packages}{tools}}, $new_tools);
+
+  write_json($testing_pkgs,$json_file);
+}
+
+main();
