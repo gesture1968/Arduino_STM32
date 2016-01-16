@@ -1,5 +1,16 @@
 #!/usr/bin/perl -w
 
+# this takes one argument: --version=[version]
+# it will take that version's data and copy it from testing.json to package_STM32duino_index.json
+# it keeps up to 100 backup copies of package_STM32duino_index.json as .0, .1, .2, etc
+#
+# packages needed to run under cygwin/Windows:
+#   perl, perl_base, perl-JSON-XS
+# packages needed to run under Fedora:
+#   perl, perl-JSON-XS, perl-Clone, perl-Getopt-Long
+# packages needed to run under Debian/Ubuntu:
+#   perl, perl-modules, libjson-xs-perl
+
 use strict;
 use JSON::XS qw(encode_json decode_json);
 use Getopt::Long;
@@ -42,7 +53,6 @@ for(my $i = 0; $i < @{$testing_data->{packages}{platforms}}; $i++) {
   if($testing_data->{packages}{platforms}[$i]{version} eq $version) {
     push(@{$normal_data->{packages}{platforms}}, $testing_data->{packages}{platforms}[$i]);
     $found_version = 1;
-    last;
   }
 }
 if(not $found_version) {
