@@ -190,7 +190,12 @@ sub main {
   }
   my(%tools);
   foreach my $host (@host_list) {
-    my($tool_zip) = zip("tools/$host",$version);
+    my($tool_zip);
+    if($host eq "win") {
+      $tool_zip = zip("tools/$host",$version);
+    } else {
+      $tool_zip = tar_gz("tools/$host",$version);
+    }
     $tools{$host} = $tool_zip;
   }
 
