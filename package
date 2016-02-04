@@ -62,7 +62,7 @@ sub tar_gz {
   my $tarfile = $destination_dir."$base_filename-$version.tar.gz";
 
   unlink($tarfile);
-  system("tar zcf $tarfile $directory");
+  system("tar zcf $tarfile --group=stm32 --owner=stm32 $directory");
   my $sha256 = `sha256sum $tarfile`;
   $sha256 =~ s/ .*//s;
   my $filestats = stat($tarfile);
