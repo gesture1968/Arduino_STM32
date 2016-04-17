@@ -61,6 +61,12 @@ void boardInit(void) {
 	gpio_set_af_mode(GPIOB,  0, 2);
 	gpio_set_af_mode(GPIOB,  1, 2);
 
+	// THIS WAS MISSING> remap TIMER4 to PD12,13,14,15
+	gpio_set_af_mode(GPIOD,  12, 2);
+	gpio_set_af_mode(GPIOD,  13, 2);
+	gpio_set_af_mode(GPIOD,  14, 2);
+	gpio_set_af_mode(GPIOD,  15, 2);
+
 	//gpio_set_af_mode(GPIOA, 2, 7);
 	//gpio_set_af_mode(GPIOA, 3, 7);
 
