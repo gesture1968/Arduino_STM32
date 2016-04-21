@@ -47,7 +47,14 @@
 
 #define SYSTICK_RELOAD_VAL      (CYCLES_PER_MICROSECOND*1000-1)
 
-#define BOARD_LED_PIN           Port2Pin('D', 12)
+#define BOARD_LED3_PIN           Port2Pin('D', 13)
+#define BOARD_LED4_PIN           Port2Pin('D', 12)
+#define BOARD_LED5_PIN           Port2Pin('D', 14)
+#define BOARD_LED6_PIN           Port2Pin('D', 15)
+#define BOARD_LED7_PIN           Port2Pin('A', 9)
+#define BOARD_LED8_PIN           Port2Pin('D', 5)
+#define BOARD_LED_PIN            BOARD_LED4_PIN
+
 #define BOARD_BUTTON_PIN        Port2Pin('A', 0)
 
 #define BOARD_NR_USARTS         5
