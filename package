@@ -4,7 +4,7 @@
 # The first run, you will need a copy of web/testing.json that already has the target
 # platforms and tools
 #
-# This tool creates the zip files for the various targets (STM32F1, GD32F1, STM32F3, STM32F4)
+# This tool creates the zip files for the various targets (STM32F1, STM32F3, STM32F4)
 # And also creates the zip or tar.gz files for the various hosts (win, linux, macosx)
 #
 # After it is done, copy the files in web/ to your webserver's directory in $base_url.  
@@ -20,8 +20,8 @@
 # configurable settings
 #######################
 my $base_url = "http://dan.drown.org/arduino/";
-my(@target_list) = ("STM32F1", "GD32F1", "STM32F3", "STM32F4");
-my(@host_list) = ("win", "linux", "macosx");
+my(@target_list) = ("STM32F1", "STM32F3", "STM32F4");
+my(@host_list) = ("win", "linux", "linux64", "macosx");
 my $json_file = "web/testing.json";
 my $destination_dir = "web/";
 
@@ -141,8 +141,10 @@ sub prepare_tools_pkg {
       $tool_archive = $tool_archives->{win};
     } elsif($new_tools->{systems}[$i]{host} =~ /^(x86_64|i386)-apple-darwin$/) {
       $tool_archive = $tool_archives->{macosx};
-    } elsif($new_tools->{systems}[$i]{host} =~ /^(x86_64|i686)-pc-linux-gnu$/) {
+    } elsif($new_tools->{systems}[$i]{host} =~ /^i686-pc-linux-gnu$/) {
       $tool_archive = $tool_archives->{linux};
+    } elsif($new_tools->{systems}[$i]{host} =~ /^x86_64-pc-linux-gnu$/) {
+      $tool_archive = $tool_archives->{linux64};
     } else {
       die("unknown tool pkg host: ".$new_tools->{systems}[$i]{host});
     }
