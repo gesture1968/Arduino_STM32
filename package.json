@@ -1,6 +1,7 @@
 {
     "name": "framework-arduino-libmaple",
     "description": "Arduino_STM32 by Dan Drown",
+    "system": "*",
     "url": "https://github.com/gesture1968/Arduino_STM32",
     "version": "1.0.0"
 }
